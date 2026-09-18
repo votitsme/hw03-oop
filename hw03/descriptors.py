@@ -1,6 +1,8 @@
 """Модуль с дескрипторами атрибутов для задания 3.2.
 
-Каждый дескриптор должен реализовать протокол дескриптора:
+Вариант 3: Logged, Typed, Observable.
+
+Каждый дескриптор реализует протокол дескриптора:
 - __set_name__(self, owner, name)
 - __get__(self, obj, objtype=None)
 - __set__(self, obj, value)
@@ -8,19 +10,17 @@
 
 from __future__ import annotations
 
+import logging
+from collections.abc import Callable
 from typing import Any
+
+Observer = Callable[[str, Any, Any], None]
+
+logger = logging.getLogger(__name__)
 
 
 class Validated:
-    """Дескриптор с проверкой типа и диапазона значений.
-
-    При записи проверяет:
-    - тип значения (raises TypeError если не совпадает)
-    - попадание в допустимый диапазон (raises ValueError если вне диапазона)
-
-    TODO: реализовать __set_name__, __get__, __set__
-    Конструктор принимает: expected_type, min_value=None, max_value=None
-    """
+    """Не входит в вариант 3, поэтому не реализован."""
 
     def __init__(
         self,
@@ -30,125 +30,107 @@ class Validated:
     ) -> None:
         raise NotImplementedError
 
-    def __set_name__(self, owner: type, name: str) -> None:
-        raise NotImplementedError
-
-    def __get__(self, obj: Any, objtype: type | None = None) -> Any:
-        raise NotImplementedError
-
-    def __set__(self, obj: Any, value: Any) -> None:
-        raise NotImplementedError
-
 
 class Logged:
-    """Дескриптор с логированием операций чтения и записи.
-
-    Каждое обращение через __get__ и __set__ записывается в logging.
-
-    TODO: реализовать __set_name__, __get__, __set__
-    Использовать модуль logging для записи сообщений.
-    """
+    """Дескриптор с логированием операций чтения и записи."""
 
     def __init__(self, default: Any = None) -> None:
-        raise NotImplementedError
+        self.default = default
+        self.name = ""
+        self.storage_name = ""
 
     def __set_name__(self, owner: type, name: str) -> None:
-        raise NotImplementedError
+        self.name = name
+        self.storage_name = f"_logged_{name}"
 
     def __get__(self, obj: Any, objtype: type | None = None) -> Any:
-        raise NotImplementedError
+        if obj is None:
+            return self
+        value = obj.__dict__.get(self.storage_name, self.default)
+        logger.info("get %s = %r", self.name, value)
+        return value
 
     def __set__(self, obj: Any, value: Any) -> None:
-        raise NotImplementedError
+        logger.info("set %s = %r", self.name, value)
+        obj.__dict__[self.storage_name] = value
 
 
 class Cached:
-    """Дескриптор с ленивым вычислением и кешированием.
-
-    Значение вычисляется при первом обращении через переданную фабричную
-    функцию и затем кешируется.
-
-    TODO: реализовать __set_name__, __get__, __set__
-    Конструктор принимает: factory (callable, вызывается без аргументов)
-    """
+    """Не входит в вариант 3, поэтому не реализован."""
 
     def __init__(self, factory: Any) -> None:
         raise NotImplementedError
 
-    def __set_name__(self, owner: type, name: str) -> None:
-        raise NotImplementedError
-
-    def __get__(self, obj: Any, objtype: type | None = None) -> Any:
-        raise NotImplementedError
-
-    def __set__(self, obj: Any, value: Any) -> None:
-        raise NotImplementedError
-
 
 class Typed:
-    """Дескриптор со строгой проверкой типа (без проверки диапазона).
-
-    При записи проверяет тип значения, raises TypeError если не совпадает.
-
-    TODO: реализовать __set_name__, __get__, __set__
-    Конструктор принимает: expected_type
-    """
+    """Дескриптор со строгой проверкой типа."""
 
     def __init__(self, expected_type: type) -> None:
-        raise NotImplementedError
+        self.expected_type = expected_type
+        self.name = ""
+        self.storage_name = ""
 
     def __set_name__(self, owner: type, name: str) -> None:
-        raise NotImplementedError
+        self.name = name
+        self.storage_name = f"_typed_{name}"
 
     def __get__(self, obj: Any, objtype: type | None = None) -> Any:
-        raise NotImplementedError
+        if obj is None:
+            return self
+        try:
+            return obj.__dict__[self.storage_name]
+        except KeyError:
+            raise AttributeError(f"{self.name} is not set") from None
 
     def __set__(self, obj: Any, value: Any) -> None:
-        raise NotImplementedError
+        if not isinstance(value, self.expected_type):
+            expected = self.expected_type.__name__
+            raise TypeError(f"{self.name} must be {expected}, got {type(value).__name__}")
+        obj.__dict__[self.storage_name] = value
 
 
 class ReadOnly:
-    """Дескриптор, допускающий однократную запись.
-
-    Первая запись проходит успешно, любая последующая raises AttributeError.
-
-    TODO: реализовать __set_name__, __get__, __set__
-    """
+    """Не входит в вариант 3, поэтому не реализован."""
 
     def __init__(self, default: Any = None) -> None:
-        raise NotImplementedError
-
-    def __set_name__(self, owner: type, name: str) -> None:
-        raise NotImplementedError
-
-    def __get__(self, obj: Any, objtype: type | None = None) -> Any:
-        raise NotImplementedError
-
-    def __set__(self, obj: Any, value: Any) -> None:
         raise NotImplementedError
 
 
 class Observable:
-    """Дескриптор с поддержкой подписки на изменения.
-
-    Хранит список callback-ов; при каждом изменении значения вызывает все
-    зарегистрированные callback-и с аргументами (name, old_value, new_value).
-
-    TODO: реализовать __set_name__, __get__, __set__, add_observer
-    """
+    """Дескриптор с подпиской на изменения значения."""
 
     def __init__(self, default: Any = None) -> None:
-        raise NotImplementedError
+        self.default = default
+        self.name = ""
+        self.storage_name = ""
+        self.observers_name = ""
 
     def __set_name__(self, owner: type, name: str) -> None:
-        raise NotImplementedError
+        self.name = name
+        self.storage_name = f"_observable_{name}"
+        self.observers_name = f"_observers_{name}"
 
     def __get__(self, obj: Any, objtype: type | None = None) -> Any:
-        raise NotImplementedError
+        if obj is None:
+            return self
+        if self.storage_name in obj.__dict__:
+            return obj.__dict__[self.storage_name]
+        if self.default is None:
+            raise AttributeError(f"{self.name} is not set")
+        return self.default
 
     def __set__(self, obj: Any, value: Any) -> None:
-        raise NotImplementedError
+        old_value = obj.__dict__.get(self.storage_name, self.default)
+        obj.__dict__[self.storage_name] = value
+        for callback in list(self.observers(obj)):
+            callback(self.name, old_value, value)
 
-    def add_observer(self, obj: Any, callback: Any) -> None:
+    def add_observer(self, obj: Any, callback: Observer) -> None:
         """Зарегистрировать callback для отслеживания изменений."""
-        raise NotImplementedError
+        self.observers(obj).append(callback)
+
+    def remove_observer(self, obj: Any, callback: Observer) -> None:
+        self.observers(obj).remove(callback)
+
+    def observers(self, obj: Any) -> list[Observer]:
+        return obj.__dict__.setdefault(self.observers_name, [])
